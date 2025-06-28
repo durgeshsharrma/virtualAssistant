@@ -52,6 +52,7 @@ function Home() {
   const handleCommand = (data) => {
     const { type, userInput, response } = data;
     speak(response);
+    setAiText(response);
 
     const open = (url) => window.open(url, "_blank");
 
@@ -91,15 +92,17 @@ function Home() {
 
     recognition.onresult = async (event) => {
       const transcript = event.results[event.results.length - 1][0].transcript.trim();
-      console.log("🗣️ User said:", transcript);
+      console.log("User said:", transcript);
       setUserText(transcript);
       recognition.stop();
+
       const data = await getGeminiResponse(transcript);
       setAiText(data.response);
       handleCommand(data);
     };
 
     recognition.start();
+
     return () => recognition.stop();
   }, []);
 
@@ -109,26 +112,35 @@ function Home() {
       setUserData(null);
       navigate("/signin");
     } catch (error) {
-      console.log(error);
       setUserData(null);
+      console.log(error);
     }
   };
 
   return (
-    <div className='w-full h-screen bg-gradient-to-t from-black to-[#02023d] flex flex-col items-center justify-center text-white'>
-      <CgMenuRight className='lg:hidden absolute top-4 right-4' onClick={() => setHam(true)} />
+    <div className="w-full h-screen bg-gradient-to-t from-black to-[#02023d] flex flex-col items-center justify-center text-white p-4">
+      <CgMenuRight className="lg:hidden absolute top-4 right-4 cursor-pointer" onClick={() => setHam(true)} />
       {ham && (
-        <div className='fixed top-0 left-0 w-full h-full bg-black/60 flex flex-col p-6 gap-4 z-50'>
-          <RxCross1 className='absolute top-4 right-4' onClick={() => setHam(false)} />
-          <button onClick={handleLogOut} className='bg-white text-black rounded-full px-4 py-2'>Log Out</button>
-          <button onClick={() => navigate("/customize")}>Customize Assistant</button>
+        <div className="fixed top-0 left-0 w-full h-full bg-black/60 p-6 flex flex-col gap-4 z-50">
+          <RxCross1 className="absolute top-4 right-4 cursor-pointer" onClick={() => setHam(false)} />
+          <button className="bg-white text-black rounded-full px-4 py-2" onClick={handleLogOut}>Log Out</button>
+          <button className="bg-white text-black rounded-full px-4 py-2" onClick={() => navigate("/customize")}>Customize Assistant</button>
         </div>
       )}
-      <img src={userData?.assistantImage || aiImg} alt='Assistant' className='w-48 h-48 rounded-full object-cover' />
-      <h1 className='text-xl font-bold mt-4'>I'm {userData?.assistantName}</h1>
-      <img src={aiText ? aiImg : userImg} alt='Status' className='w-32 my-4' />
-      <p className='text-center px-4'>{userText || aiText || "Say something..."}</p>
-      {listening && <p className='text-green-400 mt-2 animate-pulse'>🎤 Listening...</p>}
+
+      <img src={userData?.assistantImage || aiImg} alt="Assistant" className="w-48 h-48 rounded-full object-cover" />
+      <h1 className="text-xl font-bold mt-4">I'm {userData?.assistantName}</h1>
+
+      <img src={aiText ? aiImg : userImg} alt="Status" className="w-32 my-4" />
+
+      <h1 className='text-white text-[18px] font-semibold mt-4'>
+        You said: <span className='text-blue-400'>{userText || "..."}</span>
+      </h1>
+      <h1 className='text-white text-[18px] font-semibold'>
+        Assistant: <span className='text-green-400'>{aiText || "..."}</span>
+      </h1>
+
+      {listening && <p className="text-green-400 mt-4 animate-pulse">🎤 Listening...</p>}
     </div>
   );
 }
