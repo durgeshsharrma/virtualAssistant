@@ -105,8 +105,12 @@ function Home() {
       const transcript = event.results[event.results.length - 1][0].transcript.trim();
       console.log("User said:", transcript);
       const assistantName = userData?.assistantName?.toLowerCase();
-      if (assistantName && transcript.toLowerCase().includes(assistantName)) {
-        const commandText = transcript.toLowerCase().replace(assistantName, '').trim();
+      const lowerTranscript = transcript.toLowerCase();
+
+      if (assistantName && lowerTranscript.includes(assistantName)) {
+        const index = lowerTranscript.indexOf(assistantName);
+        const commandText = lowerTranscript.slice(index + assistantName.length).trim();
+
         if (commandText) {
           setUserText(commandText);
           recognition.stop();
