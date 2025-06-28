@@ -31,10 +31,37 @@ function Home() {
     }
   };
 
+  // ✅ Proper speak function with voice fix
+  const speak = (text) => {
+    const speakNow = () => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'hi-IN';
+      const voices = window.speechSynthesis.getVoices();
+      const hindiVoice = voices.find(v => v.lang === 'hi-IN');
+      if (hindiVoice) utterance.voice = hindiVoice;
+
+      isSpeakingRef.current = true;
+      utterance.onend = () => {
+        setAiText("");
+        isSpeakingRef.current = false;
+        setTimeout(() => startRecognition(), 800);
+      };
+
+      synth.cancel();
+      synth.speak(utterance);
+    };
+
+    if (window.speechSynthesis.getVoices().length === 0) {
+      setTimeout(() => speakNow(), 500);
+    } else {
+      speakNow();
+    }
+  };
+
   const startRecognition = () => {
     if (!isSpeakingRef.current && !isRecognizingRef.current) {
       try {
-        recognitionRef.current?.abort(); // clear previous state
+        recognitionRef.current?.abort();
         recognitionRef.current?.start();
         console.log("Recognition requested to start");
       } catch (error) {
@@ -45,28 +72,6 @@ function Home() {
     }
   };
 
-  const speak = (text) => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'hi-IN';
-    const voices = window.speechSynthesis.getVoices();
-    const hindiVoice = voices.find(v => v.lang === 'hi-IN');
-    if (hindiVoice) utterance.voice = hindiVoice;
-
-    isSpeakingRef.current = true;
-
-    utterance.onend = () => {
-      console.log("Speech ended");
-      setAiText("");
-      isSpeakingRef.current = false;
-      setTimeout(() => {
-        startRecognition();
-      }, 800);
-    };
-
-    synth.cancel(); // Stop any previous speech
-    synth.speak(utterance);
-  };
-
   const handleCommand = (data) => {
     const { type, userInput, response } = data;
     speak(response);
@@ -75,15 +80,20 @@ function Home() {
 
     if (type === 'google-search') open(`https://www.google.com/search?q=${encodeURIComponent(userInput)}`);
     if (type === 'calculator-open') open(`https://www.google.com/search?q=calculator`);
-    if (type === "instagram-open") open(`https://www.instagram.com/`);
-    if (type === "facebook-open") open(`https://www.facebook.com/`);
-    if (type === "weather-show") open(`https://www.google.com/search?q=weather`);
-    if (type === 'youtube-search' || type === 'youtube-play') {
-      open(`https://www.youtube.com/results?search_query=${encodeURIComponent(userInput)}`);
-    }
+    if (type === 'instagram-open') open(`https://www.instagram.com/`);
+    if (type === 'facebook-open') open(`https://www.facebook.com/`);
+    if (type === 'weather-show') open(`https://www.google.com/search?q=weather`);
+    if (type === 'youtube-search' || type === 'youtube-play') open(`https://www.youtube.com/results?search_query=${encodeURIComponent(userInput)}`);
   };
 
   useEffect(() => {
+    // ✅ Voice load fix
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+      speechSynthesis.onvoiceschanged = () => {
+        speechSynthesis.getVoices();
+      };
+    }
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
 
@@ -186,7 +196,7 @@ function Home() {
 
       <div className={`absolute lg:hidden top-0 w-full h-full bg-[#00000053] backdrop-blur-lg p-[20px] flex flex-col gap-[20px] items-start ${ham ? "translate-x-0" : "translate-x-full"} transition-transform`}>
         <RxCross1 className=' text-white absolute top-[20px] right-[20px] w-[25px] h-[25px]' onClick={() => setHam(false)} />
-        <button className='min-w-[150px] h-[60px]  text-black font-semibold bg-white rounded-full cursor-pointer text-[19px]' onClick={handleLogOut}>Log Out</button>
+        <button className='min-w-[150px] h-[60px] text-black font-semibold bg-white rounded-full cursor-pointer text-[19px]' onClick={handleLogOut}>Log Out</button>
         <button className='min-w-[150px] h-[60px] text-black font-semibold bg-white rounded-full cursor-pointer text-[19px] px-[20px] py-[10px]' onClick={() => navigate("/customize")}>Customize your Assistant</button>
         <div className='w-full h-[2px] bg-gray-400'></div>
         <h1 className='text-white font-semibold text-[19px]'>History</h1>
@@ -205,10 +215,8 @@ function Home() {
       </div>
 
       <h1 className='text-white text-[18px] font-semibold'>I'm {userData?.assistantName}</h1>
-
       {!aiText && <img src={userImg} alt="" className='w-[200px]' />}
       {aiText && <img src={aiImg} alt="" className='w-[200px]' />}
-
       <h1 className='text-white text-[18px] font-semibold text-wrap'>{userText || aiText || null}</h1>
 
       {listening && (
