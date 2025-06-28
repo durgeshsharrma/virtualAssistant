@@ -18,19 +18,20 @@ function Home() {
   const recognitionRef = useRef(null);
   const [ham, setHam] = useState(false);
   const isMountedRef = useRef(true);
+  const voicesReadyRef = useRef(false);
 
   const synth = window.speechSynthesis;
 
   const safeStartRecognition = () => {
     if (recognitionRef.current) {
       try {
-        recognitionRef.current.stop();
+        recognitionRef.current.abort();
         setTimeout(() => {
           if (!isSpeakingRef.current && isMountedRef.current) {
             recognitionRef.current.start();
             console.log("✅ Recognition safely restarted");
           }
-        }, 800);
+        }, 300);
       } catch (e) {
         console.error("Start error:", e);
       }
@@ -41,10 +42,11 @@ function Home() {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'hi-IN';
     const voices = speechSynthesis.getVoices();
-    const hindiVoice = voices.find(v => v.lang === 'hi-IN');
+    const hindiVoice = voices.find(v => v.lang === 'hi-IN') || voices[0];
     if (hindiVoice) utterance.voice = hindiVoice;
 
     isSpeakingRef.current = true;
+
     utterance.onend = () => {
       isSpeakingRef.current = false;
       safeStartRecognition();
@@ -56,8 +58,8 @@ function Home() {
 
   const handleCommand = (data) => {
     const { type, userInput, response } = data;
-    speak(response);
     setAiText(response);
+    speak(response);
 
     const open = (url) => window.open(url, "_blank");
 
@@ -104,13 +106,24 @@ function Home() {
           setUserText(commandText);
           recognition.stop();
           const data = await getGeminiResponse(commandText);
-          setAiText(data.response);
           handleCommand(data);
         }
       } else {
         console.log("Ignored: wake word not found");
+        speak(`Please say my name first like '${userData?.assistantName}, open YouTube'. कृपया पहले मेरा नाम बोलें, जैसे '${userData?.assistantName}, ओपन यूट्यूब'.`);
       }
     };
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && !isSpeakingRef.current) {
+        safeStartRecognition();
+      }
+    });
+
+    window.addEventListener("click", () => {
+      speechSynthesis.getVoices();
+      voicesReadyRef.current = true;
+    }, { once: true });
 
     recognition.start();
 
