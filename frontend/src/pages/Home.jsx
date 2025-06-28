@@ -31,7 +31,7 @@ function Home() {
             recognitionRef.current.start();
             console.log("✅ Recognition safely restarted");
           }
-        }, 300);
+        }, 100);
       } catch (e) {
         console.error("Start error:", e);
       }
@@ -57,6 +57,11 @@ function Home() {
   };
 
   const handleCommand = (data) => {
+    if (!data || !data.type || !data.response) {
+      speak("Sorry, I didn’t understand that. Please try again.");
+      return;
+    }
+
     const { type, userInput, response } = data;
     setAiText(response);
     speak(response);
@@ -105,8 +110,17 @@ function Home() {
         if (commandText) {
           setUserText(commandText);
           recognition.stop();
-          const data = await getGeminiResponse(commandText);
-          handleCommand(data);
+          try {
+            const data = await getGeminiResponse(commandText);
+            if (!data || !data.type || !data.response) {
+              speak("Sorry, I didn’t understand that. Please try again.");
+              return;
+            }
+            handleCommand(data);
+          } catch (err) {
+            console.error("Gemini API error:", err);
+            speak("Something went wrong. Please try again later.");
+          }
         }
       } else {
         console.log("Ignored: wake word not found");
