@@ -17,18 +17,23 @@ function Home() {
   const isSpeakingRef = useRef(false);
   const recognitionRef = useRef(null);
   const [ham, setHam] = useState(false);
+  const isMountedRef = useRef(true);
 
   const synth = window.speechSynthesis;
 
   const safeStartRecognition = () => {
-    try {
-      recognitionRef.current.abort();
-      setTimeout(() => {
-        recognitionRef.current.start();
-        console.log("✅ Recognition safely restarted");
-      }, 500);
-    } catch (e) {
-      console.error("Start error:", e);
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+        setTimeout(() => {
+          if (!isSpeakingRef.current && isMountedRef.current) {
+            recognitionRef.current.start();
+            console.log("✅ Recognition safely restarted");
+          }
+        }, 800);
+      } catch (e) {
+        console.error("Start error:", e);
+      }
     }
   };
 
@@ -65,6 +70,7 @@ function Home() {
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
@@ -72,38 +78,46 @@ function Home() {
     recognition.interimResults = false;
     recognitionRef.current = recognition;
 
-    if (speechSynthesis.onvoiceschanged !== undefined) {
-      speechSynthesis.onvoiceschanged = () => {
-        speechSynthesis.getVoices();
-      };
-    }
-
     recognition.onstart = () => setListening(true);
     recognition.onend = () => {
       setListening(false);
-      if (!isSpeakingRef.current) safeStartRecognition();
+      if (!isSpeakingRef.current && isMountedRef.current) {
+        safeStartRecognition();
+      }
     };
 
     recognition.onerror = (event) => {
       console.warn("Recognition error:", event.error);
       setListening(false);
-      if (event.error !== "aborted" && !isSpeakingRef.current) safeStartRecognition();
+      if (event.error !== "aborted" && isMountedRef.current && !isSpeakingRef.current) {
+        safeStartRecognition();
+      }
     };
 
     recognition.onresult = async (event) => {
       const transcript = event.results[event.results.length - 1][0].transcript.trim();
       console.log("User said:", transcript);
-      setUserText(transcript);
-      recognition.stop();
-
-      const data = await getGeminiResponse(transcript);
-      setAiText(data.response);
-      handleCommand(data);
+      const assistantName = userData?.assistantName?.toLowerCase();
+      if (assistantName && transcript.toLowerCase().includes(assistantName)) {
+        const commandText = transcript.toLowerCase().replace(assistantName, '').trim();
+        if (commandText) {
+          setUserText(commandText);
+          recognition.stop();
+          const data = await getGeminiResponse(commandText);
+          setAiText(data.response);
+          handleCommand(data);
+        }
+      } else {
+        console.log("Ignored: wake word not found");
+      }
     };
 
     recognition.start();
 
-    return () => recognition.stop();
+    return () => {
+      isMountedRef.current = false;
+      recognition.stop();
+    };
   }, []);
 
   const handleLogOut = async () => {
