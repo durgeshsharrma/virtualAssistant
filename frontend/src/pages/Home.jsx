@@ -1,4 +1,4 @@
-// Home.jsx
+// Home.jsx (UPDATED for mobile compatibility)
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { userDataContext } from '../context/UserContext';
 import { useNavigate } from 'react-router-dom';
@@ -11,12 +11,14 @@ import { RxCross1 } from "react-icons/rx";
 function Home() {
   const { userData, serverUrl, setUserData, getGeminiResponse } = useContext(userDataContext);
   const navigate = useNavigate();
+
   const [listening, setListening] = useState(false);
   const [userText, setUserText] = useState("");
   const [aiText, setAiText] = useState("");
+  const [ham, setHam] = useState(false);
+
   const isSpeakingRef = useRef(false);
   const recognitionRef = useRef(null);
-  const [ham, setHam] = useState(false);
   const isMountedRef = useRef(true);
   const voicesReadyRef = useRef(false);
 
@@ -31,7 +33,7 @@ function Home() {
             recognitionRef.current.start();
             console.log("✅ Recognition safely restarted");
           }
-        }, 100);
+        }, 300);
       } catch (e) {
         console.error("Start error:", e);
       }
@@ -49,7 +51,18 @@ function Home() {
 
     utterance.onend = () => {
       isSpeakingRef.current = false;
-      safeStartRecognition();
+      // Mobile-safe delay for restarting recognition
+      setTimeout(() => {
+        if (isMountedRef.current) safeStartRecognition();
+      }, 500);
+
+      // Fallback force retry for mobile
+      setTimeout(() => {
+        if (!listening && !isSpeakingRef.current) {
+          console.log("Retrying recognition after delay");
+          safeStartRecognition();
+        }
+      }, 2000);
     };
 
     synth.cancel();
@@ -57,11 +70,6 @@ function Home() {
   };
 
   const handleCommand = (data) => {
-    if (!data || !data.type || !data.response) {
-      speak("Sorry, I didn’t understand that. Please try again.");
-      return;
-    }
-
     const { type, userInput, response } = data;
     setAiText(response);
     speak(response);
@@ -78,6 +86,7 @@ function Home() {
 
   useEffect(() => {
     isMountedRef.current = true;
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
@@ -88,43 +97,27 @@ function Home() {
     recognition.onstart = () => setListening(true);
     recognition.onend = () => {
       setListening(false);
-      if (!isSpeakingRef.current && isMountedRef.current) {
-        safeStartRecognition();
-      }
+      if (!isSpeakingRef.current && isMountedRef.current) safeStartRecognition();
     };
 
     recognition.onerror = (event) => {
       console.warn("Recognition error:", event.error);
       setListening(false);
-      if (event.error !== "aborted" && isMountedRef.current && !isSpeakingRef.current) {
-        safeStartRecognition();
-      }
+      if (event.error !== "aborted" && isMountedRef.current && !isSpeakingRef.current) safeStartRecognition();
     };
 
     recognition.onresult = async (event) => {
       const transcript = event.results[event.results.length - 1][0].transcript.trim();
       console.log("User said:", transcript);
+
       const assistantName = userData?.assistantName?.toLowerCase();
-      const lowerTranscript = transcript.toLowerCase();
-
-      if (assistantName && lowerTranscript.includes(assistantName)) {
-        const index = lowerTranscript.indexOf(assistantName);
-        const commandText = lowerTranscript.slice(index + assistantName.length).trim();
-
+      if (assistantName && transcript.toLowerCase().includes(assistantName)) {
+        const commandText = transcript.toLowerCase().replace(assistantName, '').trim();
         if (commandText) {
           setUserText(commandText);
           recognition.stop();
-          try {
-            const data = await getGeminiResponse(commandText);
-            if (!data || !data.type || !data.response) {
-              speak("Sorry, I didn’t understand that. Please try again.");
-              return;
-            }
-            handleCommand(data);
-          } catch (err) {
-            console.error("Gemini API error:", err);
-            speak("Something went wrong. Please try again later.");
-          }
+          const data = await getGeminiResponse(commandText);
+          handleCommand(data);
         }
       } else {
         console.log("Ignored: wake word not found");
@@ -133,9 +126,7 @@ function Home() {
     };
 
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible" && !isSpeakingRef.current) {
-        safeStartRecognition();
-      }
+      if (document.visibilityState === "visible" && !isSpeakingRef.current) safeStartRecognition();
     });
 
     window.addEventListener("click", () => {
@@ -165,6 +156,7 @@ function Home() {
   return (
     <div className="w-full h-screen bg-gradient-to-t from-black to-[#02023d] flex flex-col items-center justify-center text-white p-4">
       <CgMenuRight className="lg:hidden absolute top-4 right-4 cursor-pointer" onClick={() => setHam(true)} />
+
       {ham && (
         <div className="fixed top-0 left-0 w-full h-full bg-black/60 p-6 flex flex-col gap-4 z-50">
           <RxCross1 className="absolute top-4 right-4 cursor-pointer" onClick={() => setHam(false)} />
