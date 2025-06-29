@@ -1,4 +1,4 @@
-// Home.jsx (FIXED COMMAND HANDLING)
+// Home.jsx
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { userDataContext } from '../context/UserContext';
 import { useNavigate } from 'react-router-dom';
@@ -11,14 +11,12 @@ import { RxCross1 } from "react-icons/rx";
 function Home() {
   const { userData, serverUrl, setUserData, getGeminiResponse } = useContext(userDataContext);
   const navigate = useNavigate();
-
   const [listening, setListening] = useState(false);
   const [userText, setUserText] = useState("");
   const [aiText, setAiText] = useState("");
-  const [ham, setHam] = useState(false);
-
   const isSpeakingRef = useRef(false);
   const recognitionRef = useRef(null);
+  const [ham, setHam] = useState(false);
   const isMountedRef = useRef(true);
   const voicesReadyRef = useRef(false);
 
@@ -31,6 +29,7 @@ function Home() {
         setTimeout(() => {
           if (!isSpeakingRef.current && isMountedRef.current) {
             recognitionRef.current.start();
+            console.log("✅ Recognition safely restarted");
           }
         }, 300);
       } catch (e) {
@@ -50,9 +49,7 @@ function Home() {
 
     utterance.onend = () => {
       isSpeakingRef.current = false;
-      setTimeout(() => {
-        if (isMountedRef.current) safeStartRecognition();
-      }, 500);
+      safeStartRecognition();
     };
 
     synth.cancel();
@@ -66,35 +63,16 @@ function Home() {
 
     const open = (url) => window.open(url, "_blank");
 
-    switch (type) {
-      case 'google-search':
-        open(`https://www.google.com/search?q=${encodeURIComponent(userInput)}`);
-        break;
-      case 'calculator-open':
-        open('https://www.google.com/search?q=calculator');
-        break;
-      case 'instagram-open':
-        open('https://www.instagram.com/');
-        break;
-      case 'facebook-open':
-        open('https://www.facebook.com/');
-        break;
-      case 'weather-show':
-        open('https://www.google.com/search?q=weather');
-        break;
-      case 'youtube-search':
-      case 'youtube-play':
-        open(`https://www.youtube.com/results?search_query=${encodeURIComponent(userInput)}`);
-        break;
-      default:
-        // do nothing
-        break;
-    }
+    if (type === 'google-search') open(`https://www.google.com/search?q=${encodeURIComponent(userInput)}`);
+    if (type === 'calculator-open') open(`https://www.google.com/search?q=calculator`);
+    if (type === 'instagram-open') open(`https://www.instagram.com/`);
+    if (type === 'facebook-open') open(`https://www.facebook.com/`);
+    if (type === 'weather-show') open(`https://www.google.com/search?q=weather`);
+    if (type === 'youtube-search' || type === 'youtube-play') open(`https://www.youtube.com/results?search_query=${encodeURIComponent(userInput)}`);
   };
 
   useEffect(() => {
     isMountedRef.current = true;
-
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
@@ -105,17 +83,22 @@ function Home() {
     recognition.onstart = () => setListening(true);
     recognition.onend = () => {
       setListening(false);
-      if (!isSpeakingRef.current && isMountedRef.current) safeStartRecognition();
+      if (!isSpeakingRef.current && isMountedRef.current) {
+        safeStartRecognition();
+      }
     };
 
     recognition.onerror = (event) => {
       console.warn("Recognition error:", event.error);
       setListening(false);
-      if (event.error !== "aborted" && isMountedRef.current && !isSpeakingRef.current) safeStartRecognition();
+      if (event.error !== "aborted" && isMountedRef.current && !isSpeakingRef.current) {
+        safeStartRecognition();
+      }
     };
 
     recognition.onresult = async (event) => {
       const transcript = event.results[event.results.length - 1][0].transcript.trim();
+      console.log("User said:", transcript);
       const assistantName = userData?.assistantName?.toLowerCase();
       if (assistantName && transcript.toLowerCase().includes(assistantName)) {
         const commandText = transcript.toLowerCase().replace(assistantName, '').trim();
@@ -126,12 +109,15 @@ function Home() {
           handleCommand(data);
         }
       } else {
+        console.log("Ignored: wake word not found");
         speak(`Please say my name first like '${userData?.assistantName}, open YouTube'. कृपया पहले मेरा नाम बोलें, जैसे '${userData?.assistantName}, ओपन यूट्यूब'.`);
       }
     };
 
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible" && !isSpeakingRef.current) safeStartRecognition();
+      if (document.visibilityState === "visible" && !isSpeakingRef.current) {
+        safeStartRecognition();
+      }
     });
 
     window.addEventListener("click", () => {
@@ -161,7 +147,6 @@ function Home() {
   return (
     <div className="w-full h-screen bg-gradient-to-t from-black to-[#02023d] flex flex-col items-center justify-center text-white p-4">
       <CgMenuRight className="lg:hidden absolute top-4 right-4 cursor-pointer" onClick={() => setHam(true)} />
-
       {ham && (
         <div className="fixed top-0 left-0 w-full h-full bg-black/60 p-6 flex flex-col gap-4 z-50">
           <RxCross1 className="absolute top-4 right-4 cursor-pointer" onClick={() => setHam(false)} />
