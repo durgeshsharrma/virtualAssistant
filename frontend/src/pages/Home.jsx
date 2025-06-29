@@ -1,4 +1,4 @@
-// Home.jsx (UPDATED for mobile compatibility)
+// Home.jsx (FIXED COMMAND HANDLING)
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { userDataContext } from '../context/UserContext';
 import { useNavigate } from 'react-router-dom';
@@ -31,7 +31,6 @@ function Home() {
         setTimeout(() => {
           if (!isSpeakingRef.current && isMountedRef.current) {
             recognitionRef.current.start();
-            console.log("✅ Recognition safely restarted");
           }
         }, 300);
       } catch (e) {
@@ -51,18 +50,9 @@ function Home() {
 
     utterance.onend = () => {
       isSpeakingRef.current = false;
-      // Mobile-safe delay for restarting recognition
       setTimeout(() => {
         if (isMountedRef.current) safeStartRecognition();
       }, 500);
-
-      // Fallback force retry for mobile
-      setTimeout(() => {
-        if (!listening && !isSpeakingRef.current) {
-          console.log("Retrying recognition after delay");
-          safeStartRecognition();
-        }
-      }, 2000);
     };
 
     synth.cancel();
@@ -76,12 +66,30 @@ function Home() {
 
     const open = (url) => window.open(url, "_blank");
 
-    if (type === 'google-search') open(`https://www.google.com/search?q=${encodeURIComponent(userInput)}`);
-    if (type === 'calculator-open') open(`https://www.google.com/search?q=calculator`);
-    if (type === 'instagram-open') open(`https://www.instagram.com/`);
-    if (type === 'facebook-open') open(`https://www.facebook.com/`);
-    if (type === 'weather-show') open(`https://www.google.com/search?q=weather`);
-    if (type === 'youtube-search' || type === 'youtube-play') open(`https://www.youtube.com/results?search_query=${encodeURIComponent(userInput)}`);
+    switch (type) {
+      case 'google-search':
+        open(`https://www.google.com/search?q=${encodeURIComponent(userInput)}`);
+        break;
+      case 'calculator-open':
+        open('https://www.google.com/search?q=calculator');
+        break;
+      case 'instagram-open':
+        open('https://www.instagram.com/');
+        break;
+      case 'facebook-open':
+        open('https://www.facebook.com/');
+        break;
+      case 'weather-show':
+        open('https://www.google.com/search?q=weather');
+        break;
+      case 'youtube-search':
+      case 'youtube-play':
+        open(`https://www.youtube.com/results?search_query=${encodeURIComponent(userInput)}`);
+        break;
+      default:
+        // do nothing
+        break;
+    }
   };
 
   useEffect(() => {
@@ -108,8 +116,6 @@ function Home() {
 
     recognition.onresult = async (event) => {
       const transcript = event.results[event.results.length - 1][0].transcript.trim();
-      console.log("User said:", transcript);
-
       const assistantName = userData?.assistantName?.toLowerCase();
       if (assistantName && transcript.toLowerCase().includes(assistantName)) {
         const commandText = transcript.toLowerCase().replace(assistantName, '').trim();
@@ -120,7 +126,6 @@ function Home() {
           handleCommand(data);
         }
       } else {
-        console.log("Ignored: wake word not found");
         speak(`Please say my name first like '${userData?.assistantName}, open YouTube'. कृपया पहले मेरा नाम बोलें, जैसे '${userData?.assistantName}, ओपन यूट्यूब'.`);
       }
     };
